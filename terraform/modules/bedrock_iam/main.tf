@@ -38,7 +38,7 @@ resource "aws_iam_role_policy" "bedrock_invoke" {
       Effect = "Allow"
       Action = ["bedrock:InvokeModel"]
       Resource = [
-        "arn:aws:bedrock:us-east-1::foundation-model/anthropic.claude-sonnet-4-6"
+        "arn:aws:bedrock:us-east-1:975050118039:inference-profile/us.anthropic.claude-sonnet-4-6"
       ]
     }]
   })
