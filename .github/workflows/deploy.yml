@@ -86,14 +86,12 @@ jobs:
           cd terraform
           terraform validate
 
-      - name: Install tfsec
-        run: |
-          curl -s https://raw.githubusercontent.com/aquasecurity/tfsec/master/scripts/install_linux.sh | bash
-
-      - name: Run tfsec (security scan)
-        run: |
-          tfsec terraform/ --format lovely --minimum-severity MEDIUM
-        continue-on-error: true  # warns but doesn't block for now
+      - name: Run Trivy (security scan)
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: config
+          scan-ref: terraform/
+          exit-code: 0
 
   # ─────────────────────────────────────────────
   # JOB 3: Terraform Plan (on PRs)
