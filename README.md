@@ -6,82 +6,7 @@
 
 ## Architecture
 
-```mermaid
-flowchart TD
-    Client(["🏦 Bank LOS / API Consumer"])
-
-    subgraph GitHub["GitHub"]
-        GHA["⚙️ GitHub Actions\nCI/CD Pipeline\nOIDC Keyless Auth"]
-    end
-
-    subgraph AWS["AWS — us-east-1"]
-
-        subgraph Security["Security Layer"]
-            WAF["🛡️ AWS WAFv2\nSQLi · XSS · Rate Limit\n100 req / 5 min / IP"]
-        end
-
-        subgraph API["API Layer"]
-            APIGW["🔌 API Gateway\nREST · API Key Auth\n5 req/sec · 1k/month quota\nX-Ray Tracing"]
-        end
-
-        subgraph Compute["Compute Layer"]
-            LAMBDA["λ Lambda\nPython 3.12 · 512MB · 30s\n1. Validate input\n2. Calculate DTI\n3. Build prompt\n4. Call Bedrock\n5. Save audit record"]
-        end
-
-        subgraph AI["AI Layer"]
-            BEDROCK["🤖 Amazon Bedrock\nClaude Sonnet 4.6\nCross-Region Inference\nStructured JSON output"]
-        end
-
-        subgraph Storage["Storage Layer"]
-            DYNAMO["🗄️ DynamoDB\nloan-decisions table\nPK: request_id\nGSI: decision + timestamp\nPITR · TTL · SSE"]
-        end
-
-        subgraph Observability["Observability"]
-            CW["📊 CloudWatch\nLogs · Alarms · Dashboard\np95 latency · Error rate\n5xx alerts"]
-            XRAY["🔍 X-Ray\nDistributed Tracing\nAPI GW → Lambda → Bedrock"]
-            SNS["🔔 SNS\nEmail Alerts\nOn alarm breach"]
-        end
-
-        subgraph IAM["Identity & Access"]
-            ROLE["🔐 Lambda IAM Role\nbedrock:InvokeModel\n→ claude-sonnet-4-6 only\ndynamodb:PutItem/Query\n→ loan-decisions only"]
-        end
-
-        subgraph TFState["Terraform State"]
-            S3["🪣 S3 Bucket\nTerraform State\nVersioned · Encrypted"]
-            LOCK["🔒 DynamoDB\nState Lock Table"]
-        end
-    end
-
-    Client -->|"POST /loan/evaluate\nx-api-key header"| WAF
-    WAF -->|"✅ Passes rules"| APIGW
-    WAF -->|"❌ Block SQLi · XSS · Rate limit"| Client
-    APIGW -->|"API Key valid\nAWS_PROXY"| LAMBDA
-    LAMBDA -->|"InvokeModel\nClaude Sonnet 4.6"| BEDROCK
-    BEDROCK -->|"JSON decision\nrisk_score · reasoning"| LAMBDA
-    LAMBDA -->|"PutItem\nFull audit record"| DYNAMO
-    LAMBDA -->|"HTTP 200\ndecision + reasoning"| Client
-    LAMBDA -->|"Logs · Metrics"| CW
-    LAMBDA -->|"Trace segments"| XRAY
-    CW -->|"Alarm breach"| SNS
-    ROLE -.->|"Assumed by"| LAMBDA
-    GHA -->|"OIDC token\nterraform apply"| AWS
-    GHA -->|"State read/write"| S3
-    GHA -->|"Lock acquire"| LOCK
-
-    style Client fill:#FF9900,color:#000
-    style WAF fill:#DD344C,color:#fff
-    style APIGW fill:#8C4FFF,color:#fff
-    style LAMBDA fill:#FF9900,color:#000
-    style BEDROCK fill:#01A88D,color:#fff
-    style DYNAMO fill:#3F48CC,color:#fff
-    style CW fill:#E7157B,color:#fff
-    style XRAY fill:#E7157B,color:#fff
-    style SNS fill:#E7157B,color:#fff
-    style ROLE fill:#DD344C,color:#fff
-    style S3 fill:#3F48CC,color:#fff
-    style LOCK fill:#3F48CC,color:#fff
-    style GHA fill:#24292E,color:#fff
-```
+![Intelligent Loan Decision API Architecture](docs/architecture.png)
 
 **AWS Services Used:**
 - **WAFv2** — SQLi/XSS protection + IP rate limiting (100 req / 5 min)
@@ -110,6 +35,8 @@ This is a **regulated financial services pattern**. Design decisions were intent
 | Bedrock over direct API | Keeps data inside AWS boundary — critical for financial data compliance |
 | PAY_PER_REQUEST DynamoDB | Unpredictable traffic pattern for loan submissions |
 | X-Ray tracing | Latency debugging across the async Bedrock call chain |
+| OIDC keyless CI/CD | No long-lived AWS credentials stored anywhere |
+| WAFv2 managed rules | SQLi, XSS, known exploits blocked at the edge before Lambda is invoked |
 
 ---
 
@@ -146,13 +73,13 @@ x-api-key: <your-api-key>
 ```json
 {
   "request_id": "f3a2b1c0-...",
-  "timestamp": "2024-11-15T14:32:00Z",
+  "timestamp": "2026-04-20T14:32:00Z",
   "decision": "APPROVE",
-  "risk_score": 28,
+  "risk_score": 18,
   "confidence": "HIGH",
-  "reasoning": "Applicant demonstrates stable income with a DTI of 34% including the proposed loan, well within acceptable range. Five years of continuous employment and clean credit history support approval.",
-  "risk_factors": ["Self-reported credit history only", "No asset collateral mentioned"],
-  "recommended_conditions": []
+  "reasoning": "Applicant demonstrates stable income with a DTI of 22% including the proposed loan, well within acceptable range. Five years of continuous employment and clean credit history support approval.",
+  "risk_factors": ["Self-reported credit history only"],
+  "recommended_conditions": ["Verify employment with recent pay stubs"]
 }
 ```
 
@@ -167,42 +94,26 @@ x-api-key: <your-api-key>
 - AWS CLI configured (`aws configure`)
 - Terraform >= 1.5
 - Python 3.12
-- Bedrock model access enabled in us-east-1 (Claude Sonnet 4.6)
-
-### Enable Bedrock Access
-
-Claude Sonnet 4.6 activates automatically on first invocation. No manual steps needed — AWS Marketplace subscription is triggered on first use.
+- GitHub account
 
 ### Deploy
 
 ```bash
-# 1. Clone and enter project
+# 1. Clone the repo
 git clone https://github.com/RohithBalijepalli/loan-decision-api
 cd loan-decision-api
 
-# 2. Configure variables
-cp terraform/terraform.tfvars.example terraform/terraform.tfvars
-# Edit terraform.tfvars with your values
+# 2. Run the one-time bootstrap (creates OIDC role + S3 state bucket)
+bash scripts/bootstrap-oidc.sh
 
-# 3. Init and deploy
-cd terraform
-terraform init
-terraform plan
-terraform apply
+# 3. Add GitHub Secrets (output printed by bootstrap script)
+#    AWS_ROLE_ARN, TF_STATE_BUCKET, TF_LOCK_TABLE
 
-# 4. Get your API endpoint and key
-terraform output api_endpoint
-# Get API key value from AWS Console → API Gateway → API Keys
+# 4. Push to development branch — pipeline deploys automatically
+git push origin development
 ```
 
-### Test
-
-```bash
-# Use the generated curl from outputs
-terraform output curl_example
-
-# Or run against all test cases manually using docs/test_payloads.json
-```
+See [docs/EXECUTION_GUIDE.md](docs/EXECUTION_GUIDE.md) for the full step-by-step guide.
 
 ---
 
@@ -210,20 +121,31 @@ terraform output curl_example
 
 ```
 loan-decision-api/
+├── .github/
+│   └── workflows/
+│       └── deploy.yml             # CI/CD — 5 jobs: test, lint, plan, deploy-dev, deploy-prod
+├── scripts/
+│   └── bootstrap-oidc.sh          # One-time AWS OIDC + state bucket setup
+├── src/
+│   └── lambda/
+│       └── handler.py             # Core evaluation logic (validate → DTI → Bedrock → DynamoDB)
+│   └── tests/
+│       └── test_handler.py        # Unit tests (pytest + moto)
 ├── terraform/
 │   ├── main.tf                    # Root module
 │   ├── variables.tf
 │   ├── outputs.tf
-│   ├── terraform.tfvars.example
 │   └── modules/
-│       ├── api_gateway/           # REST API + throttling + API key
+│       ├── api_gateway/           # REST API + throttling + API key + CloudWatch logging
 │       ├── lambda/                # Function + CloudWatch alarm + X-Ray
-│       ├── bedrock_iam/           # Least-privilege IAM role
-│       └── dynamodb/              # Audit table + GSI + encryption
-├── src/
-│   └── lambda/
-│       └── handler.py             # Core evaluation logic
+│       ├── bedrock_iam/           # Least-privilege IAM role (scoped to model ARN)
+│       ├── dynamodb/              # Audit table + GSI + TTL + encryption + PITR
+│       ├── monitoring/            # SNS + 4 CloudWatch alarms + dashboard
+│       └── waf/                   # WAFv2 — managed rules + rate limiting
 └── docs/
+    ├── ARCHITECTURE.md            # Full real-world architecture explanation
+    ├── EXECUTION_GUIDE.md         # Step-by-step deploy + test guide
+    ├── architecture.png           # Architecture diagram
     └── test_payloads.json         # 3 test cases: approve, deny, review
 ```
 
@@ -231,11 +153,12 @@ loan-decision-api/
 
 ## What I Learned / Engineering Notes
 
-- **Bedrock response parsing**: Claude returns clean JSON when system prompt is strict, but defensive parsing is still necessary for edge cases
+- **Bedrock inference profiles**: Claude 4.x models require cross-region inference profile IDs (`us.anthropic.claude-sonnet-4-6`), not bare model IDs — and IAM must allow both the inference profile ARN and the underlying foundation model ARN
+- **Bedrock response parsing**: Claude returns clean JSON when the system prompt is strict, but defensive parsing is still necessary for edge cases
 - **DTI calculation**: Estimated monthly payment (amount / term) is included in DTI — same approach real underwriters use
-- **Audit trail design**: Using `request_id` as DynamoDB hash key with `decision` GSI allows querying all denials — useful for bias auditing
+- **Audit trail design**: Using `request_id` as DynamoDB hash key with `decision` GSI allows querying all denials — useful for fair lending bias auditing
 - **IAM scoping**: Bedrock invoke permission is scoped to the specific model ARN, not `bedrock:*` — principle of least privilege matters in financial contexts
-- **Throttle rationale**: 5 req/sec is intentional — loan applications are low-volume, high-value. A burst of 100 req/sec would signal abuse or a runaway process
+- **API Gateway CloudWatch logging**: Requires an account-level IAM role set via `aws_api_gateway_account` before stage logging can be enabled
 
 ---
 
@@ -243,13 +166,13 @@ loan-decision-api/
 
 ```bash
 cd terraform
-terraform destroy
+terraform destroy -var="environment=dev"
 ```
 
 ---
 
 ## Author
 
-**Rohit Balijepalli** — Software Engineer  
-AWS Certified Solutions Architect | Popular Bank  
-[LinkedIn](www.linkedin.com/in/rohit-balijepalli) · [GitHub](https://github.com/RohithBalijepalli)
+**Rohit Balijepalli** — Software Engineer
+AWS Certified Solutions Architect | Popular Bank
+[LinkedIn](https://www.linkedin.com/in/rohit-balijepalli) · [GitHub](https://github.com/RohithBalijepalli)
