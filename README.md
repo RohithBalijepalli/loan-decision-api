@@ -6,28 +6,95 @@
 
 ## Architecture
 
-```
-Client Request
-     │
-     ▼
-API Gateway (REST + API Key auth)
-     │
-     ▼
-Lambda (Python 3.12)
-     │         │
-     ▼         ▼
- Bedrock    DynamoDB
- (Claude)   (Audit Log)
+```mermaid
+flowchart TD
+    Client(["🏦 Bank LOS / API Consumer"])
+
+    subgraph GitHub["GitHub"]
+        GHA["⚙️ GitHub Actions\nCI/CD Pipeline\nOIDC Keyless Auth"]
+    end
+
+    subgraph AWS["AWS — us-east-1"]
+
+        subgraph Security["Security Layer"]
+            WAF["🛡️ AWS WAFv2\nSQLi · XSS · Rate Limit\n100 req / 5 min / IP"]
+        end
+
+        subgraph API["API Layer"]
+            APIGW["🔌 API Gateway\nREST · API Key Auth\n5 req/sec · 1k/month quota\nX-Ray Tracing"]
+        end
+
+        subgraph Compute["Compute Layer"]
+            LAMBDA["λ Lambda\nPython 3.12 · 512MB · 30s\n1. Validate input\n2. Calculate DTI\n3. Build prompt\n4. Call Bedrock\n5. Save audit record"]
+        end
+
+        subgraph AI["AI Layer"]
+            BEDROCK["🤖 Amazon Bedrock\nClaude Sonnet 4.6\nCross-Region Inference\nStructured JSON output"]
+        end
+
+        subgraph Storage["Storage Layer"]
+            DYNAMO["🗄️ DynamoDB\nloan-decisions table\nPK: request_id\nGSI: decision + timestamp\nPITR · TTL · SSE"]
+        end
+
+        subgraph Observability["Observability"]
+            CW["📊 CloudWatch\nLogs · Alarms · Dashboard\np95 latency · Error rate\n5xx alerts"]
+            XRAY["🔍 X-Ray\nDistributed Tracing\nAPI GW → Lambda → Bedrock"]
+            SNS["🔔 SNS\nEmail Alerts\nOn alarm breach"]
+        end
+
+        subgraph IAM["Identity & Access"]
+            ROLE["🔐 Lambda IAM Role\nbedrock:InvokeModel\n→ claude-sonnet-4-6 only\ndynamodb:PutItem/Query\n→ loan-decisions only"]
+        end
+
+        subgraph TFState["Terraform State"]
+            S3["🪣 S3 Bucket\nTerraform State\nVersioned · Encrypted"]
+            LOCK["🔒 DynamoDB\nState Lock Table"]
+        end
+    end
+
+    Client -->|"POST /loan/evaluate\nx-api-key header"| WAF
+    WAF -->|"✅ Passes rules"| APIGW
+    WAF -->|"❌ Block SQLi · XSS · Rate limit"| Client
+    APIGW -->|"API Key valid\nAWS_PROXY"| LAMBDA
+    LAMBDA -->|"InvokeModel\nClaude Sonnet 4.6"| BEDROCK
+    BEDROCK -->|"JSON decision\nrisk_score · reasoning"| LAMBDA
+    LAMBDA -->|"PutItem\nFull audit record"| DYNAMO
+    LAMBDA -->|"HTTP 200\ndecision + reasoning"| Client
+    LAMBDA -->|"Logs · Metrics"| CW
+    LAMBDA -->|"Trace segments"| XRAY
+    CW -->|"Alarm breach"| SNS
+    ROLE -.->|"Assumed by"| LAMBDA
+    GHA -->|"OIDC token\nterraform apply"| AWS
+    GHA -->|"State read/write"| S3
+    GHA -->|"Lock acquire"| LOCK
+
+    style Client fill:#FF9900,color:#000
+    style WAF fill:#DD344C,color:#fff
+    style APIGW fill:#8C4FFF,color:#fff
+    style LAMBDA fill:#FF9900,color:#000
+    style BEDROCK fill:#01A88D,color:#fff
+    style DYNAMO fill:#3F48CC,color:#fff
+    style CW fill:#E7157B,color:#fff
+    style XRAY fill:#E7157B,color:#fff
+    style SNS fill:#E7157B,color:#fff
+    style ROLE fill:#DD344C,color:#fff
+    style S3 fill:#3F48CC,color:#fff
+    style LOCK fill:#3F48CC,color:#fff
+    style GHA fill:#24292E,color:#fff
 ```
 
 **AWS Services Used:**
-- **API Gateway** — REST API with API key auth and throttling
-- **Lambda** — Stateless evaluator function (Python 3.12)
-- **Amazon Bedrock** — Claude 3 Sonnet for AI risk reasoning
-- **DynamoDB** — Immutable audit trail of all decisions (banking compliance)
-- **CloudWatch** — Structured logs + error rate alarms
-- **IAM** — Least-privilege roles (Bedrock invoke scoped to specific model)
-- **X-Ray** — Distributed tracing across API Gateway and Lambda
+- **WAFv2** — SQLi/XSS protection + IP rate limiting (100 req / 5 min)
+- **API Gateway** — REST API with API key auth, throttling, X-Ray tracing
+- **Lambda** — Stateless evaluator function (Python 3.12, 512MB)
+- **Amazon Bedrock** — Claude Sonnet 4.6 via cross-region inference profile
+- **DynamoDB** — Immutable audit trail with GSI for compliance queries
+- **CloudWatch** — Structured logs, 4 alarms, operational dashboard
+- **X-Ray** — Distributed tracing across API Gateway → Lambda → Bedrock
+- **SNS** — Email alerts on alarm breach
+- **IAM** — Least-privilege role scoped to specific model ARN and table
+- **S3 + DynamoDB** — Terraform remote state + state locking
+- **GitHub Actions** — OIDC keyless CI/CD (no stored AWS credentials)
 
 ---
 
@@ -100,14 +167,11 @@ x-api-key: <your-api-key>
 - AWS CLI configured (`aws configure`)
 - Terraform >= 1.5
 - Python 3.12
-- Bedrock model access enabled in us-east-1 (Claude 3 Sonnet)
+- Bedrock model access enabled in us-east-1 (Claude Sonnet 4.6)
 
 ### Enable Bedrock Access
 
-Before deploying, enable model access in AWS Console:
-```
-AWS Console → Amazon Bedrock → Model access → Enable "Claude 3 Sonnet"
-```
+Claude Sonnet 4.6 activates automatically on first invocation. No manual steps needed — AWS Marketplace subscription is triggered on first use.
 
 ### Deploy
 
