@@ -1,0 +1,61 @@
+{
+  "test_cases": [
+    {
+      "name": "Strong Approve",
+      "description": "High income, low debt, long employment — should APPROVE",
+      "payload": {
+        "applicant": {
+          "name": "Sarah Johnson",
+          "annual_income": 120000,
+          "monthly_debt": 500,
+          "employment_years": 8,
+          "credit_history": "Excellent. No defaults, no late payments. 780 credit score equivalent. Two paid-off auto loans.",
+          "notes": "Senior software engineer at stable tech company"
+        },
+        "loan": {
+          "amount": 30000,
+          "term_months": 60,
+          "purpose": "Home renovation"
+        }
+      }
+    },
+    {
+      "name": "Clear Deny",
+      "description": "Low income, high debt, recent default — should DENY",
+      "payload": {
+        "applicant": {
+          "name": "Mike Torres",
+          "annual_income": 32000,
+          "monthly_debt": 1800,
+          "employment_years": 0,
+          "credit_history": "Recent default on credit card 4 months ago. Two collections accounts open.",
+          "notes": "Started new job 2 months ago, previously unemployed for 6 months"
+        },
+        "loan": {
+          "amount": 45000,
+          "term_months": 36,
+          "purpose": "Debt consolidation"
+        }
+      }
+    },
+    {
+      "name": "Borderline Review",
+      "description": "Mid-range income, moderate debt, mixed history — should REVIEW",
+      "payload": {
+        "applicant": {
+          "name": "Priya Patel",
+          "annual_income": 68000,
+          "monthly_debt": 1200,
+          "employment_years": 3,
+          "credit_history": "One late payment 18 months ago, otherwise clean. Student loans in good standing.",
+          "notes": "Self-employed consultant, income varies month to month"
+        },
+        "loan": {
+          "amount": 20000,
+          "term_months": 48,
+          "purpose": "Business equipment"
+        }
+      }
+    }
+  ]
+}
