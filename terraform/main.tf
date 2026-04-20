@@ -13,13 +13,13 @@ terraform {
   }
 
   # Uncomment to use S3 backend (recommended for production)
-  # backend "s3" {
-  #   bucket         = "your-terraform-state-bucket"
-  #   key            = "loan-decision-api/terraform.tfstate"
-  #   region         = "us-east-1"
-  #   encrypt        = true
-  #   dynamodb_table = "terraform-state-lock"
-  # }
+  backend "s3" {
+    bucket         = "your-terraform-state-bucket"
+    key            = "loan-decision-api/terraform.tfstate"
+    region         = "us-east-1"
+    encrypt        = true
+    dynamodb_table = "terraform-state-lock"
+  }
 }
 
 provider "aws" {
