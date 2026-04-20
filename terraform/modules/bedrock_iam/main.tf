@@ -26,7 +26,7 @@ resource "aws_iam_role_policy_attachment" "lambda_basic" {
 }
 
 # --------------------------------------------------------------------------
-# Bedrock invoke permission (least privilege — Claude 3 Sonnet only)
+# Bedrock invoke permission (least privilege — Claude Sonnet 4.6 only)
 # --------------------------------------------------------------------------
 resource "aws_iam_role_policy" "bedrock_invoke" {
   name = "${var.project_name}-${var.environment}-bedrock-invoke"
@@ -38,7 +38,7 @@ resource "aws_iam_role_policy" "bedrock_invoke" {
       Effect = "Allow"
       Action = ["bedrock:InvokeModel"]
       Resource = [
-        "arn:aws:bedrock:us-east-1::foundation-model/anthropic.claude-3-sonnet-20240229-v1:0"
+        "arn:aws:bedrock:us-east-1::foundation-model/anthropic.claude-sonnet-4-6"
       ]
     }]
   })
