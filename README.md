@@ -1,6 +1,6 @@
-# 🏦 Intelligent Loan Decision API
+# Intelligent Loan Decision API
 
-> A serverless, AI-powered loan pre-screening API built on AWS. Uses Claude 3 Sonnet via Amazon Bedrock to evaluate loan applications with explainable risk reasoning — fully provisioned with Terraform.
+> A serverless, AI-powered loan pre-screening API built on AWS. Uses Claude Sonnet 4.6 via Amazon Bedrock to evaluate loan applications with explainable risk reasoning — fully provisioned with Terraform and deployed via GitHub Actions CI/CD.
 
 ---
 
@@ -113,7 +113,7 @@ AWS Console → Amazon Bedrock → Model access → Enable "Claude 3 Sonnet"
 
 ```bash
 # 1. Clone and enter project
-git clone https://github.com/yourusername/loan-decision-api
+git clone https://github.com/RohithBalijepalli/loan-decision-api
 cd loan-decision-api
 
 # 2. Configure variables
@@ -188,4 +188,4 @@ terraform destroy
 
 **Rohit Balijepalli** — Software Engineer  
 AWS Certified Solutions Architect | Popular Bank  
-[LinkedIn](https://linkedin.com/in/yourprofile) · [GitHub](https://github.com/yourusername)
+[LinkedIn](www.linkedin.com/in/rohit-balijepalli) · [GitHub](https://github.com/RohithBalijepalli)
