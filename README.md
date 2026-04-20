@@ -87,6 +87,25 @@ x-api-key: <your-api-key>
 
 ---
 
+## Screenshots
+
+### CI/CD Pipeline
+![Pipeline](docs/screenshots/pipeline.png)
+
+### APPROVE Decision
+![Approve](docs/screenshots/approve.png)
+
+### DENY Decision
+![Deny](docs/screenshots/deny.png)
+
+### REVIEW Decision
+![Review](docs/screenshots/review.png)
+
+### Audit Trail — DynamoDB
+![DynamoDB](docs/screenshots/dynamodb.png)
+
+---
+
 ## Getting Started
 
 ### Prerequisites
@@ -112,9 +131,6 @@ bash scripts/bootstrap-oidc.sh
 # 4. Push to development branch — pipeline deploys automatically
 git push origin development
 ```
-
-See [docs/EXECUTION_GUIDE.md](docs/EXECUTION_GUIDE.md) for the full step-by-step guide.
-
 ---
 
 ## Project Structure
@@ -144,22 +160,20 @@ loan-decision-api/
 │       └── waf/                   # WAFv2 — managed rules + rate limiting
 └── docs/
     ├── ARCHITECTURE.md            # Full real-world architecture explanation
-    ├── EXECUTION_GUIDE.md         # Step-by-step deploy + test guide
     ├── architecture.png           # Architecture diagram
+    ├── screenshots/               # Live demo screenshots
     └── test_payloads.json         # 3 test cases: approve, deny, review
 ```
 
 ---
 
-## What I Learned / Engineering Notes
+## Engineering Notes
 
-- **Bedrock inference profiles**: Claude 4.x models require cross-region inference profile IDs (`us.anthropic.claude-sonnet-4-6`), not bare model IDs — and IAM must allow both the inference profile ARN and the underlying foundation model ARN
-- **Bedrock response parsing**: Claude returns clean JSON when the system prompt is strict, but defensive parsing is still necessary for edge cases
+- **Bedrock inference profiles**: Claude 4.x models require cross-region inference profile IDs (`us.anthropic.claude-sonnet-4-6`), not bare model IDs — IAM must allow both the inference profile ARN and the underlying foundation model ARN
 - **DTI calculation**: Estimated monthly payment (amount / term) is included in DTI — same approach real underwriters use
-- **Audit trail design**: Using `request_id` as DynamoDB hash key with `decision` GSI allows querying all denials — useful for fair lending bias auditing
-- **IAM scoping**: Bedrock invoke permission is scoped to the specific model ARN, not `bedrock:*` — principle of least privilege matters in financial contexts
-- **API Gateway CloudWatch logging**: Requires an account-level IAM role set via `aws_api_gateway_account` before stage logging can be enabled
-
+- **Audit trail design**: `request_id` as DynamoDB hash key with `decision` GSI enables querying all denials — critical for fair lending bias auditing
+- **IAM scoping**: Bedrock invoke permission scoped to specific model ARN, not `bedrock:*` — least privilege matters in financial contexts
+- **API Gateway logging**: Requires account-level IAM role via `aws_api_gateway_account` before stage logging can be enabled
 ---
 
 ## Cleanup
@@ -173,6 +187,6 @@ terraform destroy -var="environment=dev"
 
 ## Author
 
-**Rohit Balijepalli** — Software Engineer
+**Rohit Balijepalli** - Software Engineer
 AWS Certified Solutions Architect | Popular Bank
 [LinkedIn](https://www.linkedin.com/in/rohit-balijepalli) · [GitHub](https://github.com/RohithBalijepalli)
