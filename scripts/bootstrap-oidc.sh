@@ -9,7 +9,7 @@
 set -euo pipefail
 
 # ── EDIT THESE ──────────────────────────────────────────────────
-GITHUB_ORG="your-github-username"        # e.g. rohitbalijepalli
+GITHUB_ORG="RohithBalijepalli"        # e.g. rohitbalijepalli
 GITHUB_REPO="loan-decision-api"
 AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
 ROLE_NAME="github-actions-loan-api-role"

@@ -8,7 +8,7 @@ import os
 import pytest
 import boto3
 from unittest.mock import patch, MagicMock
-from moto import mock_dynamodb
+from moto import mock_aws
 
 # Set env vars before importing handler
 os.environ["AWS_DEFAULT_REGION"] = "us-east-1"
@@ -159,7 +159,7 @@ class TestParseDecision:
 
 class TestLambdaHandler:
 
-    @mock_dynamodb
+    @mock_aws
     @patch("handler.invoke_bedrock")
     def test_successful_approval(self, mock_bedrock, apigw_event, mock_bedrock_response):
         # Setup DynamoDB table
@@ -182,7 +182,7 @@ class TestLambdaHandler:
         assert "reasoning" in body
         assert body["risk_score"] == 28
 
-    @mock_dynamodb
+    @mock_aws
     @patch("handler.invoke_bedrock")
     def test_response_has_required_fields(self, mock_bedrock, apigw_event, mock_bedrock_response):
         dynamodb = boto3.resource("dynamodb", region_name="us-east-1")

@@ -147,7 +147,7 @@ Evaluate this application and return your decision as JSON."""
 
 def invoke_bedrock(prompt):
     response = bedrock.invoke_model(
-        modelId="anthropic.claude-sonnet-4-6",
+        modelId="us.anthropic.claude-sonnet-4-6",
         body=json.dumps({
             "anthropic_version": "bedrock-2023-05-31",
             "max_tokens": 1000,

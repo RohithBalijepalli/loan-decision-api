@@ -4,6 +4,33 @@ variable "lambda_invoke_arn" {}
 variable "lambda_function_name" {}
 
 # --------------------------------------------------------------------------
+# Account-level CloudWatch Logs role for API Gateway (required before logging)
+# --------------------------------------------------------------------------
+resource "aws_iam_role" "apigw_cloudwatch" {
+  name = "${var.project_name}-${var.environment}-apigw-cw-role"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect    = "Allow"
+      Principal = { Service = "apigateway.amazonaws.com" }
+      Action    = "sts:AssumeRole"
+    }]
+  })
+}
+
+resource "aws_iam_role_policy_attachment" "apigw_cloudwatch" {
+  role       = aws_iam_role.apigw_cloudwatch.name
+  policy_arn = "arn:aws:iam::aws:policy/service-role/AmazonAPIGatewayPushToCloudWatchLogs"
+}
+
+resource "aws_api_gateway_account" "main" {
+  cloudwatch_role_arn = aws_iam_role.apigw_cloudwatch.arn
+
+  depends_on = [aws_iam_role_policy_attachment.apigw_cloudwatch]
+}
+
+# --------------------------------------------------------------------------
 # REST API
 # --------------------------------------------------------------------------
 resource "aws_api_gateway_rest_api" "loan_api" {
@@ -83,6 +110,8 @@ resource "aws_api_gateway_stage" "stage" {
   }
 
   xray_tracing_enabled = true
+
+  depends_on = [aws_api_gateway_account.main]
 }
 
 resource "aws_cloudwatch_log_group" "api_logs" {
